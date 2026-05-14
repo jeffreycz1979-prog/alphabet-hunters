@@ -318,21 +318,39 @@ function OnboardingScreen({ onDone }) {
 // ─────────────────────────────────────────────
 // 4. My Bag 頁面
 // ─────────────────────────────────────────────
+
+// 固定的隨機種子排列（每次開 App 不變，但順序打亂）
+// 貼紙堆的隨機位置/旋轉靠 index 產生偽隨機，不用 Math.random()
+function pseudoRand(seed, max) {
+  const x = Math.sin(seed + 1) * 10000;
+  return Math.abs(x - Math.floor(x)) * max;
+}
+
 function MyBagScreen({ solved, gridLevels, onClose }) {
-  // 依照 TARGET_PHRASE 順序，收集已解鎖的貼紙
-  // 找出每個 answer 對應的 solved 狀態
   const answerToSolved = {};
   gridLevels.forEach(lvl => {
     if (solved.includes(lvl.id)) answerToSolved[lvl.answer] = true;
   });
 
-  // 每個 answer 只能用一次（TWO 和 FLOWER 都給 I，WATER 給 I）
-  // 依照關卡 id 順序排排看哪些已解鎖
   const answerOrder = ['WATER','DINOSAUR','MUSIC','BIRD','STATUE','FLOWER','TWO','SKATE','BALL'];
   const unlockedCount = answerOrder.filter(a => answerToSolved[a]).length;
   const allUnlocked = unlockedCount === 9;
-
   const phrase = TARGET_PHRASE; // ['I','❤️','E','N','G','L','I','S','H']
+
+  // 已解鎖的貼紙（打亂順序顯示）
+  const unlockedStickers = answerOrder
+    .map((ans, i) => ({ ans, letter: phrase[i], color: LEVELS_SOURCE.find(l=>l.answer===ans)?.color || '#fff' }))
+    .filter(s => answerToSolved[s.ans]);
+
+  // 用固定 seed 打亂順序（不影響正確答案）
+  const shuffledStickers = [...unlockedStickers].sort((a, b) => {
+    const ia = answerOrder.indexOf(a.ans);
+    const ib = answerOrder.indexOf(b.ans);
+    return pseudoRand(ia * 7, 1) - pseudoRand(ib * 7, 1);
+  });
+
+  // 鎖定格（未解鎖的）
+  const lockedCount = 9 - unlockedCount;
 
   return (
     <div className="overlay-bg" style={{
@@ -349,12 +367,12 @@ function MyBagScreen({ solved, gridLevels, onClose }) {
       }}>
         {/* Header */}
         <div style={{
-          padding:'18px 20px 14px',
+          padding:'16px 20px 12px',
           display:'flex', justifyContent:'space-between', alignItems:'center',
           borderBottom:'1px solid rgba(255,255,255,0.1)', flexShrink:0,
         }}>
           <div>
-            <div style={{ fontSize:22, fontWeight:700, color:'#fff', display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ fontSize:20, fontWeight:700, color:'#fff', display:'flex', alignItems:'center', gap:8 }}>
               🎒 My Bag
             </div>
             <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', marginTop:2 }}>
@@ -370,57 +388,103 @@ function MyBagScreen({ solved, gridLevels, onClose }) {
         </div>
 
         {/* Body */}
-        <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'20px 16px 24px' }}>
+        <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'16px 16px 24px' }}>
 
-          {/* 通關密語說明 */}
+          {/* 說明 */}
           <div style={{
-            background:'rgba(255,255,255,0.08)', borderRadius:16,
-            padding:'12px 14px', marginBottom:20, textAlign:'center',
-            border:'1px solid rgba(255,255,255,0.15)',
+            background:'rgba(255,255,255,0.08)', borderRadius:14,
+            padding:'10px 14px', marginBottom:16, textAlign:'center',
+            border:'1px solid rgba(255,255,255,0.12)',
           }}>
-            <p style={{ margin:0, fontSize:12, color:'rgba(255,255,255,0.7)', fontWeight:700, lineHeight:1.6 }}>
-              🇬🇧 Collect all 9 stickers to reveal the secret phrase!<br/>
-              🇹🇼 集齊 9 張貼紙，拼出神秘通關密語！
+            <p style={{ margin:0, fontSize:12, color:'rgba(255,255,255,0.75)', fontWeight:700, lineHeight:1.6 }}>
+              <span style={{ background:'#1d4ed8', color:'#fff', borderRadius:4, padding:'1px 6px', fontSize:10, marginRight:5 }}>EN</span>
+              Arrange your stickers to spell the secret phrase!<br/>
+              <span style={{ background:'#dc2626', color:'#fff', borderRadius:4, padding:'1px 6px', fontSize:10, marginRight:5 }}>中</span>
+              把你的貼紙排列，拼出神秘通關密語！
             </p>
           </div>
 
-          {/* 貼紙格子 */}
-          <div style={{
-            display:'grid', gridTemplateColumns:'repeat(9,1fr)',
-            gap:4, marginBottom:20,
-          }}>
-            {answerOrder.map((ans, i) => {
-              const isUnlocked = !!answerToSolved[ans];
-              const letter = phrase[i];
-              return (
-                <div key={i} style={{
-                  aspectRatio:'1',
-                  borderRadius:10,
-                  display:'flex', alignItems:'center', justifyContent:'center',
-                  fontSize: letter==='❤️' ? 'clamp(10px,3.5vw,18px)' : 'clamp(12px,4vw,20px)',
-                  fontWeight:700,
-                  background: isUnlocked ? '#fff' : 'rgba(255,255,255,0.08)',
-                  border: isUnlocked ? '2px solid #facc15' : '2px solid rgba(255,255,255,0.15)',
-                  color: isUnlocked ? '#1e1b4b' : 'transparent',
-                  boxShadow: isUnlocked ? '0 3px 0 #facc15' : 'none',
-                  transition:'all 0.3s',
-                  position:'relative',
-                }}>
-                  {isUnlocked ? letter : '?'}
-                </div>
-              );
-            })}
-          </div>
+          {/* ── 貼紙堆（已解鎖，隨機排列）── */}
+          {unlockedCount > 0 && (
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:1, marginBottom:10, textTransform:'uppercase' }}>
+                Your Stickers / 你的貼紙
+              </div>
+              {/* 隨機散落的貼紙堆 */}
+              <div style={{
+                background:'rgba(255,255,255,0.05)',
+                borderRadius:18, border:'1px solid rgba(255,255,255,0.1)',
+                padding:'16px 12px',
+                display:'flex', flexWrap:'wrap', gap:10, justifyContent:'center',
+                minHeight:90,
+              }}>
+                {shuffledStickers.map((s, i) => {
+                  // 每張貼紙有略微不同的旋轉，讓它看起來像散落的
+                  const rot = (pseudoRand(i * 13, 16) - 8).toFixed(1); // -8 ~ +8 度
+                  return (
+                    <div key={i} className="sticker-pop" style={{
+                      width: 'clamp(44px,12vw,56px)',
+                      height: 'clamp(44px,12vw,56px)',
+                      borderRadius:12,
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      fontSize: s.letter==='❤️' ? 'clamp(20px,6vw,28px)' : 'clamp(22px,7vw,30px)',
+                      fontWeight:700,
+                      background: '#fff',
+                      color:'#1e1b4b',
+                      boxShadow:`0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.8)`,
+                      border:`3px solid ${s.color}`,
+                      transform:`rotate(${rot}deg)`,
+                      animationDelay:`${i * 0.06}s`,
+                      cursor:'default',
+                    }}>
+                      {s.letter}
+                    </div>
+                  );
+                })}
+              </div>
+              <p style={{ fontSize:11, color:'rgba(255,255,255,0.4)', textAlign:'center', margin:'8px 0 0', fontWeight:700 }}>
+                ↑ Can you figure out the secret phrase? / 你能拼出通關密語嗎？
+              </p>
+            </div>
+          )}
 
-          {/* 通關密語顯示 */}
+          {/* 未解鎖的格子（顯示問號，不顯示數量提示） */}
+          {lockedCount > 0 && (
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:1, marginBottom:10, textTransform:'uppercase' }}>
+                Locked / 尚未收集
+              </div>
+              <div style={{
+                display:'flex', flexWrap:'wrap', gap:8, justifyContent:'center',
+                background:'rgba(255,255,255,0.03)',
+                borderRadius:16, padding:'14px 10px',
+                border:'1px dashed rgba(255,255,255,0.1)',
+              }}>
+                {Array(lockedCount).fill(null).map((_,i) => (
+                  <div key={i} style={{
+                    width:'clamp(40px,11vw,52px)', height:'clamp(40px,11vw,52px)',
+                    borderRadius:10,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:18,
+                    background:'rgba(255,255,255,0.06)',
+                    border:'2px dashed rgba(255,255,255,0.15)',
+                    color:'rgba(255,255,255,0.2)',
+                    fontWeight:700,
+                  }}>🔒</div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 通關密語空格區 */}
           <div style={{
-            background: allUnlocked ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.05)',
-            border: allUnlocked ? '2px solid #facc15' : '2px solid rgba(255,255,255,0.1)',
-            borderRadius:18, padding:'16px', marginBottom:20, textAlign:'center',
+            background: allUnlocked ? 'rgba(250,204,21,0.15)' : 'rgba(255,255,255,0.04)',
+            border: allUnlocked ? '2px solid #facc15' : '2px solid rgba(255,255,255,0.08)',
+            borderRadius:18, padding:'16px', marginBottom:16, textAlign:'center',
           }}>
             {allUnlocked ? (
               <>
-                <div style={{ fontSize:11, fontWeight:700, color:'#facc15', letterSpacing:1, marginBottom:8 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#facc15', letterSpacing:1, marginBottom:10 }}>
                   SECRET PHRASE UNLOCKED! / 通關密語解鎖！ 🎉
                 </div>
                 <div className="shimmer-text" style={{ fontSize:'clamp(20px,7vw,32px)', fontWeight:700, letterSpacing:4 }}>
@@ -429,29 +493,28 @@ function MyBagScreen({ solved, gridLevels, onClose }) {
               </>
             ) : (
               <>
-                <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.5)', letterSpacing:1, marginBottom:12 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.4)', letterSpacing:1, marginBottom:12 }}>
                   🔒 SECRET PHRASE / 通關密語
                 </div>
-                {/* 全部空格，不透露任何字母 */}
-                <div style={{ display:'flex', justifyContent:'center', gap:5, flexWrap:'wrap' }}>
+                <div style={{ display:'flex', justifyContent:'center', gap:4, flexWrap:'wrap' }}>
                   {Array(9).fill(null).map((_,i) => (
                     <div key={i} style={{
-                      width:26, height:32,
-                      borderBottom:'3px solid rgba(255,255,255,0.25)',
+                      width:24, height:30,
+                      borderBottom:'3px solid rgba(255,255,255,0.2)',
                       display:'flex', alignItems:'flex-end', justifyContent:'center',
                       paddingBottom:2,
-                      fontSize:16, color:'rgba(255,255,255,0.2)', fontWeight:700,
+                      fontSize:15, color:'rgba(255,255,255,0.15)', fontWeight:700,
                     }}>_</div>
                   ))}
                 </div>
-                <div style={{ fontSize:11, color:'rgba(255,255,255,0.35)', marginTop:12 }}>
-                  {9 - unlockedCount} more sticker{9-unlockedCount!==1?'s':''} to go · 還差 {9-unlockedCount} 張貼紙
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)', marginTop:10 }}>
+                  {9 - unlockedCount} more sticker{9-unlockedCount!==1?'s':''} to go · 還差 {9-unlockedCount} 張
                 </div>
               </>
             )}
           </div>
 
-          {/* 回起點提示 */}
+          {/* 集齊後：回起點提示 */}
           {allUnlocked && (
             <div style={{
               background:'linear-gradient(135deg,#facc15,#f97316)',
@@ -459,9 +522,11 @@ function MyBagScreen({ solved, gridLevels, onClose }) {
               textAlign:'center', boxShadow:'0 6px 20px rgba(249,115,22,0.4)',
             }}>
               <div style={{ fontSize:28, marginBottom:8 }}>🚇🏆</div>
-              <div style={{ fontSize:14, fontWeight:700, color:'#fff', lineHeight:1.6 }}>
-                🇬🇧 Head back to MRT Exit 3 to claim your prize!<br/>
-                🇹🇼 回到捷運 3 號出口，領取最終通關獎品！
+              <div style={{ fontSize:13, fontWeight:700, color:'#fff', lineHeight:1.7 }}>
+                <span style={{ background:'rgba(0,0,0,0.15)', borderRadius:4, padding:'1px 6px', fontSize:10, marginRight:4 }}>EN</span>
+                Head back to MRT Exit 3 to claim your prize!<br/>
+                <span style={{ background:'rgba(0,0,0,0.15)', borderRadius:4, padding:'1px 6px', fontSize:10, marginRight:4 }}>中</span>
+                回到捷運 3 號出口，領取最終通關獎品！
               </div>
             </div>
           )}
@@ -472,7 +537,83 @@ function MyBagScreen({ solved, gridLevels, onClose }) {
 }
 
 // ─────────────────────────────────────────────
-// 5. 提示燈箱
+// 5. 地圖燈箱
+// ─────────────────────────────────────────────
+const MAP_URL = 'https://jeffreycz1979-prog.github.io/alphabet-hunters/map.png';
+
+function MapScreen({ onClose }) {
+  return (
+    <div className="overlay-bg" style={{
+      position:'fixed', inset:0, zIndex:90,
+      background:'rgba(0,0,0,0.9)',
+      display:'flex', flexDirection:'column',
+    }}>
+      {/* Header */}
+      <div style={{
+        padding:'12px 16px',
+        paddingTop:'calc(12px + env(safe-area-inset-top))',
+        display:'flex', justifyContent:'space-between', alignItems:'center',
+        background:'rgba(0,0,0,0.6)', flexShrink:0,
+      }}>
+        <div>
+          <div style={{ fontSize:16, fontWeight:700, color:'#fff' }}>🗺️ Park Map / 公園地圖</div>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Pinch to zoom · 雙指放大縮小</div>
+        </div>
+        <button onClick={onClose} style={{
+          background:'rgba(255,255,255,0.15)', border:'none', borderRadius:'50%',
+          width:36, height:36, cursor:'pointer', fontSize:16,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          touchAction:'manipulation', color:'#fff',
+        }}>✕</button>
+      </div>
+
+      {/* 地圖圖片：overflow:auto 讓縮放後可滑動 */}
+      <div style={{
+        flex:1, overflow:'auto', WebkitOverflowScrolling:'touch',
+        display:'flex', alignItems:'flex-start', justifyContent:'center',
+        padding:8,
+      }}>
+        <img
+          src={MAP_URL}
+          alt="HESS Hippo Challenge Park Map"
+          style={{
+            width:'100%', maxWidth:900, height:'auto',
+            borderRadius:10, display:'block',
+            touchAction:'pan-x pan-y pinch-zoom',
+          }}
+        />
+      </div>
+
+      {/* 底部地點速查 */}
+      <div style={{
+        padding:'10px 12px',
+        paddingBottom:'calc(10px + env(safe-area-inset-bottom))',
+        background:'rgba(0,0,0,0.6)', flexShrink:0,
+      }}>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', justifyContent:'center' }}>
+          {[
+            ['1','觀音像'],['3','MRT Exit'],['4','Sunken'],
+            ['6','溜冰場'],['7','恐龍'],['8','籃球場'],
+            ['9','生態池'],['10','涼亭'],['12','音樂台'],
+          ].map(([num, label]) => (
+            <div key={num} style={{ display:'flex', alignItems:'center', gap:3 }}>
+              <div style={{
+                width:18, height:18, borderRadius:'50%',
+                background:'#dc2626', color:'#fff',
+                fontSize:10, fontWeight:700,
+                display:'flex', alignItems:'center', justifyContent:'center',
+              }}>{num}</div>
+              <span style={{ fontSize:10, color:'rgba(255,255,255,0.65)', fontWeight:700 }}>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// 6. 提示燈箱
 // ─────────────────────────────────────────────
 function HintToast({ hint, onClose }) {
   if (!hint) return null;
@@ -756,6 +897,7 @@ function ResultView({ level, onClose }) {
 export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showBag,        setShowBag]        = useState(false);
+  const [showMap,        setShowMap]        = useState(false);
   const [gridLevels,     setGridLevels]     = useState([]);
   const [solved,         setSolved]         = useState([]);
   const [current,        setCurrent]        = useState(null);
@@ -868,6 +1010,7 @@ export default function App() {
 
       {showOnboarding && <OnboardingScreen onDone={handleOnboardDone} />}
       {showBag && <MyBagScreen solved={solved} gridLevels={gridLevels} onClose={() => setShowBag(false)} />}
+      {showMap && <MapScreen onClose={() => setShowMap(false)} />}
       {hint && <HintToast hint={hint} onClose={() => setHint(null)} />}
 
       {/* ── Header ── */}
@@ -942,52 +1085,52 @@ export default function App() {
           })}
         </div>
 
-        {/* ── My Bag 按鈕 ── */}
-        <button
-          onClick={() => setShowBag(true)}
-          className="btn-press"
-          style={{
-            marginTop:14, width:'100%',
-            background:'linear-gradient(135deg,#1e1b4b,#4338ca)',
-            border:'none', borderBottom:'4px solid #1e1b4b',
-            borderRadius:20, padding:'14px 20px',
-            display:'flex', alignItems:'center', justifyContent:'space-between',
-            cursor:'pointer', touchAction:'manipulation',
-            boxShadow:'0 5px 15px rgba(30,27,75,0.35)',
-          }}
-        >
-          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <span style={{ fontSize:28 }}>🎒</span>
+        {/* ── My Bag 按鈕 + 地圖按鈕（並排）── */}
+        <div style={{ display:'flex', gap:10, marginTop:14 }}>
+          {/* My Bag */}
+          <button
+            onClick={() => setShowBag(true)}
+            className="btn-press"
+            style={{
+              flex:1,
+              background:'linear-gradient(135deg,#1e1b4b,#4338ca)',
+              border:'none', borderBottom:'4px solid #1e1b4b',
+              borderRadius:18, padding:'12px 14px',
+              display:'flex', alignItems:'center', gap:10,
+              cursor:'pointer', touchAction:'manipulation',
+              boxShadow:'0 5px 15px rgba(30,27,75,0.35)',
+            }}
+          >
+            <span style={{ fontSize:26 }}>🎒</span>
             <div style={{ textAlign:'left' }}>
-              <div style={{ fontSize:15, fontWeight:700, color:'#fff' }}>My Bag</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.6)' }}>
-                數位字母貼紙收集袋
+              <div style={{ fontSize:14, fontWeight:700, color:'#fff' }}>My Bag</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)' }}>
+                {collectedCount}/9 貼紙
               </div>
             </div>
-          </div>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            {/* 小貼紙預覽 */}
-            <div style={{ display:'flex', gap:3 }}>
-              {['WATER','DINOSAUR','MUSIC'].map((ans,i) => (
-                <div key={i} style={{
-                  width:22, height:22, borderRadius:5,
-                  background: answerToSolved[ans] ? '#facc15' : 'rgba(255,255,255,0.15)',
-                  display:'flex', alignItems:'center', justifyContent:'center',
-                  fontSize:10, fontWeight:700, color:'#1e1b4b',
-                }}>
-                  {answerToSolved[ans] ? TARGET_PHRASE[['WATER','DINOSAUR','MUSIC','BIRD','STATUE','FLOWER','TWO','SKATE','BALL'].indexOf(ans)] : '?'}
-                </div>
-              ))}
-              <div style={{
-                width:22, height:22, borderRadius:5,
-                background:'rgba(255,255,255,0.1)',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                fontSize:9, color:'rgba(255,255,255,0.5)', fontWeight:700,
-              }}>+{9-Math.min(3,collectedCount)}</div>
+          </button>
+
+          {/* 地圖 */}
+          <button
+            onClick={() => setShowMap(true)}
+            className="btn-press"
+            style={{
+              flex:1,
+              background:'linear-gradient(135deg,#065f46,#059669)',
+              border:'none', borderBottom:'4px solid #065f46',
+              borderRadius:18, padding:'12px 14px',
+              display:'flex', alignItems:'center', gap:10,
+              cursor:'pointer', touchAction:'manipulation',
+              boxShadow:'0 5px 15px rgba(6,95,70,0.35)',
+            }}
+          >
+            <span style={{ fontSize:26 }}>🗺️</span>
+            <div style={{ textAlign:'left' }}>
+              <div style={{ fontSize:14, fontWeight:700, color:'#fff' }}>地圖</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)' }}>Park Map</div>
             </div>
-            <span style={{ fontSize:18, color:'rgba(255,255,255,0.6)' }}>›</span>
-          </div>
-        </button>
+          </button>
+        </div>
 
         <div style={{
           marginTop:10, background:'rgba(255,255,255,0.3)',

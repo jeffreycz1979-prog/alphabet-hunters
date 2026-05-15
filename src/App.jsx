@@ -584,30 +584,8 @@ function MapScreen({ onClose }) {
         />
       </div>
 
-      {/* 底部地點速查 */}
-      <div style={{
-        padding:'10px 12px',
-        paddingBottom:'calc(10px + env(safe-area-inset-bottom))',
-        background:'rgba(0,0,0,0.6)', flexShrink:0,
-      }}>
-        <div style={{ display:'flex', gap:6, flexWrap:'wrap', justifyContent:'center' }}>
-          {[
-            ['1','觀音像'],['3','MRT Exit'],['4','Sunken'],
-            ['6','溜冰場'],['7','恐龍'],['8','籃球場'],
-            ['9','生態池'],['10','涼亭'],['12','音樂台'],
-          ].map(([num, label]) => (
-            <div key={num} style={{ display:'flex', alignItems:'center', gap:3 }}>
-              <div style={{
-                width:18, height:18, borderRadius:'50%',
-                background:'#dc2626', color:'#fff',
-                fontSize:10, fontWeight:700,
-                display:'flex', alignItems:'center', justifyContent:'center',
-              }}>{num}</div>
-              <span style={{ fontSize:10, color:'rgba(255,255,255,0.65)', fontWeight:700 }}>{label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* 底部 safe area 補白 */}
+      <div style={{ paddingBottom:'env(safe-area-inset-bottom)', background:'rgba(0,0,0,0.6)', flexShrink:0 }} />
     </div>
   );
 }

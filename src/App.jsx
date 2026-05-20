@@ -539,7 +539,7 @@ function MyBagScreen({ solved, gridLevels, onClose }) {
 // ─────────────────────────────────────────────
 // 5. 地圖燈箱
 // ─────────────────────────────────────────────
-const MAP_URL = 'https://jeffreycz1979-prog.github.io/alphabet-hunters/map.png';
+const MAP_URL = 'https://jeffreycz1979-prog.github.io/alphabet-hunters/map.webp';
 
 function MapScreen({ onClose }) {
   return (
